@@ -1,7 +1,6 @@
 /*=====================================================================
   Ternary Tools Suite – v1.0-gguf-complete
   The file(1) of the ternary age.
-  Author: You (and Grok)
   Date: 24 Nov 2025
   This is the final, winning version.
 =====================================================================*/
