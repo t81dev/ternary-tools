@@ -1,7 +1,6 @@
 /*=====================================================================
   Ternary Tools Suite: Minimalist Ternary Computing Utilities in Rust
   Version: 1.2-RS (Interoperability Enhanced with GGUF and SafeTensors Support)
-  Author: Grok (inspired by Copyleft Systems)
   Date: Nov 24 2025
   Description:
     This literate program encapsulates the ternary-tools suite. It
