@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -30,21 +31,35 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum GgufOp {
-    Summary { file: String, #[arg(long, default_value_t = true)] ternary: bool },
-    Info    { file: String, #[arg(long)] ternary: bool },
+    Summary {
+        file: String,
+        #[arg(long, default_value_t = true)]
+        ternary: bool,
+    },
+    Info {
+        file: String,
+        #[arg(long)]
+        ternary: bool,
+    },
     Show {
         file: String,
         tensor: String,
-        #[arg(long, default_value_t = 16)] head: usize,
-        #[arg(long)] raw: bool,
-        #[arg(long)] ternary: bool,
+        #[arg(long, default_value_t = 16)]
+        head: usize,
+        #[arg(long)]
+        raw: bool,
+        #[arg(long)]
+        ternary: bool,
     },
-    Validate { file: String },
+    Validate {
+        file: String,
+    },
 }
 
 /*=====================================================================
   GGUF Structures
 =====================================================================*/
+
 #[derive(Debug)]
 struct GgufHeader {
     magic: u32,
@@ -63,44 +78,52 @@ struct GgufTensorInfo {
 
 #[derive(Debug, Clone)]
 enum GgufValue {
-    Uint8(u8), Int8(i8),
-    Uint16(u16), Int16(i16),
-    Uint32(u32), Int32(i32),
-    Uint64(u64), Int64(i64),
-    Float32(f32), Float64(f64),
+    Uint8(u8),
+    Int8(i8),
+    Uint16(u16),
+    Int16(i16),
+    Uint32(u32),
+    Int32(i32),
+    Uint64(u64),
+    Int64(i64),
+    Float32(f32),
+    Float64(f64),
     Bool(bool),
     String(String),
     Array(Vec<GgufValue>),
 }
 
 /*=====================================================================
-  Display for GgufValue (with alternate = ternary for integers)
+  Display for GgufValue (alternate = balanced ternary for integers)
 =====================================================================*/
+
 impl std::fmt::Display for GgufValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
-            // Alternate form: try to render integral types in base-3
+            // Alternate form: show integral values in balanced ternary (-, 0, +)
             match self {
-                GgufValue::Uint8(v)   => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Int8(v)    => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Uint16(v)  => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Int16(v)   => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Uint32(v)  => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Int32(v)   => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Uint64(v)  => write!(f, "{}", int_to_ternary(*v as i64)),
-                GgufValue::Int64(v)   => write!(f, "{}", int_to_ternary(*v)),
+                GgufValue::Uint8(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Int8(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Uint16(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Int16(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Uint32(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Int32(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Uint64(v) => write!(f, "{}", int_to_balanced_ternary(*v as i64)),
+                GgufValue::Int64(v) => write!(f, "{}", int_to_balanced_ternary(*v)),
                 other => write!(f, "{:?}", other),
             }
         } else {
             match self {
                 GgufValue::String(s) => write!(f, "{}", s),
-                GgufValue::Bool(b)   => write!(f, "{}", b),
+                GgufValue::Bool(b) => write!(f, "{}", b),
                 GgufValue::Float32(x) => write!(f, "{:.6}", x),
                 GgufValue::Float64(x) => write!(f, "{:.6}", x),
                 GgufValue::Array(arr) => {
                     write!(f, "[")?;
                     for (i, v) in arr.iter().enumerate() {
-                        if i > 0 { write!(f, ", ")?; }
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
                         write!(f, "{}", v)?;
                     }
                     write!(f, "]")
@@ -114,18 +137,21 @@ impl std::fmt::Display for GgufValue {
 /*=====================================================================
   Main
 =====================================================================*/
+
 fn main() {
     let cli = Cli::parse();
     match cli.command {
         Commands::Gguf { op } => match op {
-            GgufOp::Summary { file, ternary } =>
-                gguf_summary(&file, ternary),
-            GgufOp::Info { file, ternary } =>
-                gguf_info(&file, ternary),
-            GgufOp::Show { file, tensor, head, raw, ternary } =>
-                gguf_show(&file, &tensor, head, raw, ternary),
-            GgufOp::Validate { file } =>
-                gguf_validate(&file),
+            GgufOp::Summary { file, ternary } => gguf_summary(&file, ternary),
+            GgufOp::Info { file, ternary } => gguf_info(&file, ternary),
+            GgufOp::Show {
+                file,
+                tensor,
+                head,
+                raw,
+                ternary,
+            } => gguf_show(&file, &tensor, head, raw, ternary),
+            GgufOp::Validate { file } => gguf_validate(&file),
         },
         _ => println!("The ternary age has come. Rejoice."),
     }
@@ -134,6 +160,7 @@ fn main() {
 /*=====================================================================
   Commands
 =====================================================================*/
+
 fn gguf_summary(path: &str, ternary: bool) {
     let mut f = File::open(path).expect("File not found — are you in the correct timeline?");
     let header = parse_header(&mut f);
@@ -146,11 +173,22 @@ fn gguf_summary(path: &str, ternary: bool) {
         .unwrap_or("unknown");
     let params = estimate_parameters(&metadata, &tensors);
 
-    let first_quant = tensors.first().map(|t| gguf_type_name(t.kind)).unwrap_or("unknown");
+    let first_quant = tensors
+        .first()
+        .map(|t| gguf_type_name(t.kind))
+        .unwrap_or("unknown");
 
     println!("GGUF | {} | v{}", arch, header.version);
-    println!("Parameters : {} ({})", params, int_to_ternary(params as i64));
-    println!("Tensors    : {} ({})", tensors.len(), int_to_ternary(tensors.len() as i64));
+    println!(
+        "Parameters : {} ({})",
+        params,
+        int_to_balanced_ternary(params as i64)
+    );
+    println!(
+        "Tensors    : {} ({})",
+        tensors.len(),
+        int_to_balanced_ternary(tensors.len() as i64)
+    );
     println!(
         "Quant      : {} → {}",
         first_quant,
@@ -184,11 +222,20 @@ fn gguf_info(path: &str, ternary: bool) {
     println!("METADATA");
     println!("{:=<80}", "=");
     for (k, v) in &metadata {
-        if ternary && (k.contains("count") || k.contains("size") || k.contains("dim") ||
-                       k.contains("param") || k.contains("length"))
+        if ternary
+            && (k.contains("count")
+                || k.contains("size")
+                || k.contains("dim")
+                || k.contains("param")
+                || k.contains("length"))
         {
             if let Ok(n) = v.parse::<i64>() {
-                println!("{:<40} = {} ({})", k, v, int_to_ternary(n));
+                println!(
+                    "{:<40} = {} ({})",
+                    k,
+                    v,
+                    int_to_balanced_ternary(n)
+                );
                 continue;
             }
         }
@@ -198,9 +245,17 @@ fn gguf_info(path: &str, ternary: bool) {
     println!("TENSORS");
     println!("{:=<80}", "=");
     for t in tensors {
-        let shape = t.dims.iter().map(|d| d.to_string()).collect::<Vec<_>>().join("×");
+        let shape = t
+            .dims
+            .iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join("×");
         let type_name = gguf_type_name(t.kind);
-        println!("{:<48} {:<20} {:<12} offset={}", t.name, shape, type_name, t.offset);
+        println!(
+            "{:<48} {:<20} {:<12} offset={}",
+            t.name, shape, type_name, t.offset
+        );
     }
 }
 
@@ -221,7 +276,12 @@ fn gguf_show(path: &str, tensor_name: &str, head: usize, raw: bool, ternary: boo
         .map(|d| d.to_string())
         .collect::<Vec<_>>()
         .join("×");
-    println!("Tensor : {} | Shape : {} | Type : {}", tensor.name, shape_str, gguf_type_name(tensor.kind));
+    println!(
+        "Tensor : {} | Shape : {} | Type : {}",
+        tensor.name,
+        shape_str,
+        gguf_type_name(tensor.kind)
+    );
 
     f.seek(SeekFrom::Start(tensor.offset)).unwrap();
     let (element_size, decoder) = gguf_type_decoder(tensor.kind);
@@ -244,20 +304,20 @@ fn gguf_show(path: &str, tensor_name: &str, head: usize, raw: bool, ternary: boo
         } else if ternary {
             match &value {
                 GgufValue::Float32(_) | GgufValue::Float64(_) => {
-                    // Do not ternarify floats; print normally.
+                    // Floats stay decimal; ternary is about discrete states here
                     println!(" [{}] {}", i, value);
                 }
                 GgufValue::Int64(n) => {
-                    println!(" [{}] {}", i, int_to_ternary(*n));
+                    println!(" [{}] {}", i, int_to_balanced_ternary(*n));
                 }
                 GgufValue::Int32(n) => {
-                    println!(" [{}] {}", i, int_to_ternary(*n as i64));
+                    println!(" [{}] {}", i, int_to_balanced_ternary(*n as i64));
                 }
                 GgufValue::Uint64(n) => {
-                    println!(" [{}] {}", i, int_to_ternary(*n as i64));
+                    println!(" [{}] {}", i, int_to_balanced_ternary(*n as i64));
                 }
                 GgufValue::Uint32(n) => {
-                    println!(" [{}] {}", i, int_to_ternary(*n as i64));
+                    println!(" [{}] {}", i, int_to_balanced_ternary(*n as i64));
                 }
                 _ => {
                     println!(" [{}] {}", i, value);
@@ -267,6 +327,7 @@ fn gguf_show(path: &str, tensor_name: &str, head: usize, raw: bool, ternary: boo
             println!(" [{}] {}", i, value);
         }
     }
+
     if elements_read < head {
         println!("... (reached end of tensor)");
     }
@@ -283,11 +344,16 @@ fn gguf_validate(path: &str) {
 }
 
 /*=====================================================================
-  Ternary Soul — base-3 view
+  Ternary Soul — base-3 and balanced views
 =====================================================================*/
+
 fn int_to_ternary(mut n: i64) -> String {
-    if n == 0 { return "0".to_string(); }
-    if n < 0 { return format!("-{}", int_to_ternary(-n)); }
+    if n == 0 {
+        return "0".to_string();
+    }
+    if n < 0 {
+        return format!("-{}", int_to_ternary(-n));
+    }
     let mut digits = Vec::new();
     while n > 0 {
         let rem = (n % 3) as u8;
@@ -298,6 +364,43 @@ fn int_to_ternary(mut n: i64) -> String {
     digits.into_iter().collect()
 }
 
+/// Balanced ternary: digits in {-1, 0, +1} rendered as '-', '0', '+'
+/// Negative numbers get a leading '-' to distinguish sign from digit.
+fn int_to_balanced_ternary(mut n: i64) -> String {
+    if n == 0 {
+        return "0".to_string();
+    }
+
+    let neg = n < 0;
+    if neg {
+        n = -n;
+    }
+
+    let mut digits = Vec::new();
+    while n != 0 {
+        let mut rem = n % 3; // 0, 1, 2 for positive n
+        n /= 3;
+        if rem == 2 {
+            rem = -1;
+            n += 1;
+        }
+        let ch = match rem {
+            -1 => '-',
+            0 => '0',
+            1 => '+',
+            _ => unreachable!(),
+        };
+        digits.push(ch);
+    }
+
+    digits.reverse();
+    let mut s: String = digits.into_iter().collect();
+    if neg {
+        s.insert(0, '-');
+    }
+    s
+}
+
 fn ternary_checksum(meta: &HashMap<String, String>) -> String {
     let mut h = 0i64;
     for (k, v) in meta {
@@ -306,12 +409,14 @@ fn ternary_checksum(meta: &HashMap<String, String>) -> String {
             h = h.wrapping_mul(3);
         }
     }
+    // Checksums stay as plain base-3
     int_to_ternary(h.abs())
 }
 
 /*=====================================================================
   Correct GGUF Parsing — No More Heresy
 =====================================================================*/
+
 const GGUF_MAGIC: u32 = u32::from_le_bytes(*b"GGUF");
 
 fn parse_header(f: &mut File) -> GgufHeader {
@@ -353,7 +458,12 @@ fn parse_tensors(f: &mut File, count: u64) -> Vec<GgufTensorInfo> {
         }
         let kind = read_u32(f);
         let offset = read_u64(f);
-        vec.push(GgufTensorInfo { name, dims, kind, offset });
+        vec.push(GgufTensorInfo {
+            name,
+            dims,
+            kind,
+            offset,
+        });
     }
     vec
 }
@@ -385,20 +495,37 @@ fn read_u64(f: &mut File) -> u64 {
 
 fn read_value(f: &mut File, ty: u32) -> GgufValue {
     match ty {
-        0  => { let mut b = [0u8; 1]; f.read_exact(&mut b).unwrap(); GgufValue::Uint8(b[0]) }
-        1  => { let mut b = [0u8; 1]; f.read_exact(&mut b).unwrap(); GgufValue::Int8(b[0] as i8) }
-        2  => GgufValue::Uint16(read_u16(f)),
-        3  => { let v = read_u16(f); GgufValue::Int16(v as i16) }
-        4  => GgufValue::Uint32(read_u32(f)),
-        5  => { let v = read_u32(f); GgufValue::Int32(v as i32) }
-        6  => {
+        0 => {
+            let mut b = [0u8; 1];
+            f.read_exact(&mut b).unwrap();
+            GgufValue::Uint8(b[0])
+        }
+        1 => {
+            let mut b = [0u8; 1];
+            f.read_exact(&mut b).unwrap();
+            GgufValue::Int8(b[0] as i8)
+        }
+        2 => GgufValue::Uint16(read_u16(f)),
+        3 => {
+            let v = read_u16(f);
+            GgufValue::Int16(v as i16)
+        }
+        4 => GgufValue::Uint32(read_u32(f)),
+        5 => {
+            let v = read_u32(f);
+            GgufValue::Int32(v as i32)
+        }
+        6 => {
             let mut b = [0u8; 4];
             f.read_exact(&mut b).unwrap();
             GgufValue::Float32(f32::from_le_bytes(b))
         }
-        7  => GgufValue::Uint64(read_u64(f)),
-        8  => { let v = read_u64(f); GgufValue::Int64(v as i64) }
-        9  => {
+        7 => GgufValue::Uint64(read_u64(f)),
+        8 => {
+            let v = read_u64(f);
+            GgufValue::Int64(v as i64)
+        }
+        9 => {
             let mut b = [0u8; 8];
             f.read_exact(&mut b).unwrap();
             GgufValue::Float64(f64::from_le_bytes(b))
@@ -417,6 +544,10 @@ fn read_value(f: &mut File, ty: u32) -> GgufValue {
         _ => GgufValue::String(format!("UNKNOWN_TYPE_{}", ty)),
     }
 }
+
+/*=====================================================================
+  Parameter Estimation
+=====================================================================*/
 
 fn estimate_parameters(metadata: &HashMap<String, String>, tensors: &[GgufTensorInfo]) -> u64 {
     metadata
@@ -440,13 +571,29 @@ fn estimate_parameters(metadata: &HashMap<String, String>, tensors: &[GgufTensor
 /*=====================================================================
   Quantization Types & Preview Decoding
 =====================================================================*/
+
 fn gguf_type_name(kind: u32) -> &'static str {
     match kind {
-        0 => "F32",     1 => "F16",     2 => "Q4_0",    3 => "Q4_1",
-        6 => "Q5_0",    7 => "Q5_1",    8 => "Q8_0",    9 => "Q8_1",
-        10 => "Q2_K",   11 => "Q3_K",   12 => "Q4_K",   13 => "Q5_K",
-        14 => "Q6_K",   15 => "Q8_K",   16 => "IQ2_XXS",17 => "IQ2_XS",
-        18 => "IQ3_XXS",19 => "IQ3_XS", 20 => "IQ4_XS", 21 => "IQ4_NL",
+        0 => "F32",
+        1 => "F16",
+        2 => "Q4_0",
+        3 => "Q4_1",
+        6 => "Q5_0",
+        7 => "Q5_1",
+        8 => "Q8_0",
+        9 => "Q8_1",
+        10 => "Q2_K",
+        11 => "Q3_K",
+        12 => "Q4_K",
+        13 => "Q5_K",
+        14 => "Q6_K",
+        15 => "Q8_K",
+        16 => "IQ2_XXS",
+        17 => "IQ2_XS",
+        18 => "IQ3_XXS",
+        19 => "IQ3_XS",
+        20 => "IQ4_XS",
+        21 => "IQ4_NL",
         _ => "UNKNOWN",
     }
 }
