@@ -28,3 +28,35 @@ jobs:
 
       - name: fmt
         run: cargo fmt --all -- --check
+
+  runtime-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ternary-tools
+        uses: actions/checkout@v4
+        with:
+          path: ternary-tools
+
+      - name: Checkout t81-vm
+        uses: actions/checkout@v4
+        with:
+          repository: t81dev/t81-vm
+          path: t81-vm
+          ref: main
+
+      - name: Validate runtime contract marker
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          repo = Path("ternary-tools/contracts/runtime-contract.json")
+          vm = Path("t81-vm/docs/contracts/vm-compatibility.json")
+          repo_contract = json.loads(repo.read_text(encoding="utf-8"))
+          vm_contract = json.loads(vm.read_text(encoding="utf-8"))
+
+          if repo_contract.get("contract_version") != vm_contract.get("contract_version"):
+              raise SystemExit("contract_version mismatch between ternary-tools and t81-vm")
+
+          print("runtime contract marker: ok")
+          PY

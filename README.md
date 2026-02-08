@@ -98,6 +98,7 @@ MIT — because even in the ternary age, some things must remain balanced.
 ## Migration integration
 
 - Phase 2 checklist: `docs/phase2-inspection-checklist.md`
+- Runtime contract marker: `contracts/runtime-contract.json`
 
 ---
 
