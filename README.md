@@ -95,6 +95,10 @@ Pull requests that decrease it will be closed with a single comment:
 
 MIT — because even in the ternary age, some things must remain balanced.
 
+## Migration integration
+
+- Phase 2 checklist: `docs/phase2-inspection-checklist.md`
+
 ---
 
 **The timeline is fixed.**
